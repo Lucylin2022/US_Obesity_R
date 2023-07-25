@@ -77,7 +77,7 @@ kable(anova(fit3), caption='ANOVA Table')
 
 plot(Data_Value ~ Lean_value, data = combined_data)
 abline(fit3, col = 'red')
-#plot of obesity rates vs lean value is weak
+#plot of obesity rates vs lean value
 
 ```
 
