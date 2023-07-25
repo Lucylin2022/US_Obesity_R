@@ -1,0 +1,93 @@
+---
+title: "Adult Obesity vs Income and political affiliation"
+author: "Lucy Lin"
+date: "2023-07-13"
+output: pdf_document
+---
+This is a small project that uses multiple linear regression to create a model of the percentage of obesity given the information from the CDC's 2021 Obesity/Weight status by income dataset.
+
+The link to this data can be found here:
+https://nccd.cdc.gov/dnpao_dtm/rdPage.aspx?rdReport=DNPAO_DTM.ExploreByTopic&islClass=OWS&islTopic=OWS1&go=GO 
+
+
+I have also used the party affiliation by state chart from Pew Research. 
+
+The link to this data can be found here: https://www.pewresearch.org/religion/religious-landscape-study/compare/party-affiliation/by/state/ 
+
+```{r}
+#Formatting and preparing the data
+raw_data <- read.csv("C:/Users/Ycull/Downloads/AdultObesity_Income_2021.csv")
+data <- raw_data[8:364,c(1,6,15,29)]
+names(data)[2] <- 'State'
+#I filtered the data and renamed "LocationDesc" to "State"
+
+political_data <-read.csv("C:/Users/Ycull/Downloads/Party affiliation by state - Sheet1.csv")
+
+#install.packages("dplyr")
+#comment out install functions for R Markdown
+library(dplyr)
+#Using dplyr package to merge the two tables
+
+combined_data <- inner_join(data,political_data, by = "State")
+combined_data <- combined_data[,c(1:5,7)]
+
+combined_data$Republican.lean.Rep. <- as.numeric(sub("%", "", combined_data$Republican.lean.Rep.,fixed=TRUE))/100
+combined_data$Democrat.lean.Dem. <- as.numeric(sub("%", "", combined_data$Democrat.lean.Dem.,fixed=TRUE))/100
+
+combined_data$Lean_value <- combined_data$Republican.lean.Rep. - combined_data$Democrat.lean.Dem.
+#Positive values of lean_value imply that the state has more Republicans than Democrats and negative values vice versa 
+
+combined_data <- combined_data[!grepl("Data not reported", combined_data$Stratification1),]
+#removed columns of unknown income
+
+combined_data <- combined_data[!grepl("-", combined_data$Data_Value),]
+combined_data <- combined_data[!grepl("~", combined_data$Data_Value),]
+#removed columns of unknown obesity values
+
+names(combined_data)[names(combined_data) == 'Stratification1'] <- 'Income_Bracket'
+#renamed "Stratification1" to "Income_Bracket"
+
+combined_data$Income_Bracket <- as.factor(combined_data$Income_Bracket)
+#Income bracket is now a factor with 6 levels 
+```
+My hypothesis is that residents with higher income in Democratic-leaning states are most likely to have lower obesity rates. My assumptions are that higher incomes enable healthier lifestyles for the residents and Democratic-leaning states are more likely to enforce progressive regulations on healthful foods. 
+
+```{r}
+levels(combined_data$Income_Bracket)
+combined_data$Income_Bracket1 = relevel(combined_data$Income_Bracket, ref = 'Less than $15,000')
+#combined_data$Income_Bracket1 = factor(combined_data$Income_Bracket, levels = c("Less than $15,000","$15,000 - $24,999", "$25,000 - $34,999","$35,000 - $49,999","$50,000 - $74,999", "$75,000 or greater"))
+levels(combined_data$Income_Bracket1)
+#Choosing a baseline constraint of the lowest income bracket by reordering baseline levels
+#Expectation is that as income levels increase further from the baseline, the variable will probably become more statistically significant
+
+fit1 = lm(Data_Value ~ Income_Bracket1 + Lean_value + Income_Bracket1:Lean_value , data = combined_data)
+summary(fit1)
+
+fit2 = lm(Data_Value ~ Income_Bracket1 + Lean_value, data = combined_data)
+summary(fit2)
+
+fit3 = lm(Data_Value ~ Lean_value, data = combined_data)
+summary(fit3)
+
+fit4 = lm(Data_Value ~ Income_Bracket1, data = combined_data)
+summary(fit4)
+
+library(knitr)
+kable(anova(fit3), caption='ANOVA Table')
+
+plot(Data_Value ~ Lean_value, data = combined_data)
+abline(fit3, col = 'red')
+#plot of obesity rates vs lean value is weak
+
+```
+
+Based on the multiple regression model using the lowest income bracket of "Less than $15,000" as the baseline constraint, there is a weak correlation present between income and obesity. As I have predicted, obesity rates seem to decrease as income increases. In other words, as income increases farther from the baseline income, each income bracket, as a factor, becomes more statistically significant. This is also suggested by the national averages by income brackets in the first few rows of the CDC's dataset. 
+
+There is an even weaker correlation between the state's political affiliation but this variable still remains statistically significant. Specifically, Republican leaning states tend to have higher rates of obesity. 
+
+The interaction variable between income and political affiliation appear to less significant. Yet, if this is taken into consideration, increased income results in a lower increase in obesity rates. 
+
+While my r^2 values are very low, my p-values are statistically significant and therefore do suggest there is some level of correlation. 
+
+There are obvious limitations to these models and data. 
+The sample sizes vary greatly for each state and the CDC has disclaimers about the possible inaccuracies of this dataset. My fitted models rely on only two variables and state governments might have a lot less to do with obesity rates in their state. Obesity is a complex issue and is rampant across the entire country. 
